@@ -1,16 +1,14 @@
 package com.imaddev
 
-import com.imaddev.data.collections.User
-import com.imaddev.data.registerUser
+import com.imaddev.data.checkPasswordForEmail
+import com.imaddev.routes.loginRoute
+import com.imaddev.routes.noteRoute
+import com.imaddev.routes.registerRoute
 import io.ktor.application.*
+import io.ktor.auth.*
 import io.ktor.features.*
 import io.ktor.gson.*
-import io.ktor.response.*
-import io.ktor.request.*
 import io.ktor.routing.*
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 
 fun main(args: Array<String>): Unit = io.ktor.server.netty.EngineMain.main(args)
 
@@ -19,14 +17,35 @@ fun main(args: Array<String>): Unit = io.ktor.server.netty.EngineMain.main(args)
 fun Application.module(testing: Boolean = false) {
     install(DefaultHeaders)
     install(CallLogging)
-    install(Routing)
+
     install(ContentNegotiation) {
         gson {
             setPrettyPrinting()
         }
     }
-    CoroutineScope(Dispatchers.IO).launch {
-        registerUser(User("imad@gmail.com", "123456"))
+
+    install(Authentication) {
+        configureAuth()
+    }
+
+    install(Routing) {
+        registerRoute()
+        loginRoute()
+        noteRoute()
     }
 }
+
+private fun Authentication.Configuration.configureAuth() {
+    basic {
+        realm = "Note Server"
+        validate { credentials ->
+            val email = credentials.name
+            val password = credentials.password
+            if (checkPasswordForEmail(email, password)) {
+                UserIdPrincipal(email)
+            } else null
+        }
+    }
+}
+
 
