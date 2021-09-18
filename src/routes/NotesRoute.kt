@@ -1,8 +1,10 @@
 package com.imaddev.routes
 
+import com.imaddev.data.*
 import com.imaddev.data.collections.Note
-import com.imaddev.data.getNotesForUser
-import com.imaddev.data.saveNote
+import com.imaddev.data.collections.User
+import com.imaddev.requests.AddOwnerRequest
+import com.imaddev.requests.DeleteNoteRequest
 import com.imaddev.responses.SimpleResponse
 import io.ktor.application.*
 import io.ktor.auth.*
@@ -39,6 +41,52 @@ fun Route.noteRoute() {
                     call.respond(OK)
                 } else {
                     call.respond(Conflict)
+                }
+            }
+        }
+    }
+
+    route("/deleteNote") {
+        authenticate {
+            post {
+                val email = call.principal<UserIdPrincipal>()!!.name
+                val request = try {
+                    call.receive<DeleteNoteRequest>()
+                } catch (e: ContentTransformationException) {
+                    call.respond(BadRequest)
+                    return@post
+                }
+
+                if (deleteNoteForUser(email, request.id)) {
+                    call.respond(OK)
+                } else {
+                    call.respond(Conflict)
+                }
+            }
+        }
+    }
+
+    route("/addOwner") {
+        authenticate {
+            post {
+                val request = try {
+                    call.receive<AddOwnerRequest>()
+                } catch (e: ContentTransformationException) {
+                    call.respond(BadRequest)
+                    return@post
+                }
+                if (!checkIfUserExists(request.owner)) {
+                    call.respond(OK, SimpleResponse(false, "No user with this email"))
+                    return@post
+                }
+                if (!isOwnerOfNote(request.noteId, request.owner)) {
+                    if (addOwnerToNote(request.noteId, request.owner)) {
+                        call.respond(OK, SimpleResponse(true, "${request.owner} can now see this note"))
+                    } else {
+                        call.respond(Conflict)
+                    }
+                } else {
+                    call.respond(OK, SimpleResponse(false, "This user already an owner of this note"))
                 }
             }
         }

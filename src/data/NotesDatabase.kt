@@ -7,6 +7,7 @@ import org.litote.kmongo.coroutine.coroutine
 import org.litote.kmongo.coroutine.insertOne
 import org.litote.kmongo.eq
 import org.litote.kmongo.reactivestreams.KMongo
+import org.litote.kmongo.setValue
 
 private val client = KMongo.createClient().coroutine
 private val database = client.getDatabase("NotesDatabase")
@@ -38,4 +39,30 @@ suspend fun saveNote(note: Note): Boolean {
     } else {
         notes.insertOne(note).wasAcknowledged()
     }
+}
+
+suspend fun deleteNoteForUser(email: String, noteId: String): Boolean {
+    val note = notes.findOne(Note::id eq noteId, Note::owners contains email)
+    note?.let { note ->
+        if (note.owners.size > 1) {
+            val newOwners = note.owners - email
+            val updateResult = notes.updateOne(Note::id eq note.id, setValue(Note::owners, newOwners))
+            return updateResult.wasAcknowledged()
+        }
+
+        return notes.deleteOneById(note.id).wasAcknowledged()
+
+    } ?: return false
+}
+
+
+suspend fun isOwnerOfNote(noteId: String, owner: String): Boolean {
+    val note = notes.findOneById(noteId) ?: return false
+    return owner in note.owners
+}
+
+
+suspend fun addOwnerToNote(noteId: String, owner: String): Boolean {
+    val owners = notes.findOneById(noteId)?.owners ?: return false
+    return notes.updateOneById(noteId, setValue(Note::owners, owners + owner)).wasAcknowledged()
 }
